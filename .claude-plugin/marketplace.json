@@ -1,0 +1,21 @@
+{
+  "name": "event-agency-skills",
+  "owner": {
+    "name": "TalkValue",
+    "email": "support@trytalkvalue.com"
+  },
+  "metadata": {
+    "description": "AI skills for event professionals — inbox triage, vendor management, and production coordination.",
+    "homepage": "https://trytalkvalue.com",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "event-agency-skills",
+      "source": "./",
+      "description": "Event industry persona and recipe skills for Claude Code — inbox triage with stakeholder classification, vendor management, and a full event coordinator operating model.",
+      "category": "productivity",
+      "tags": ["events", "event-management", "gmail", "inbox-triage", "vendor-management", "production"]
+    }
+  ]
+}

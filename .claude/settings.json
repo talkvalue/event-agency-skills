@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gws * +triage*)",
+      "Bash(gws * +read*)",
+      "Bash(gws * +agenda*)",
+      "Bash(gws * list*)",
+      "Bash(gws * get*)",
+      "Bash(gws * schema*)",
+      "Bash(gws auth *)"
+    ]
+  }
+}

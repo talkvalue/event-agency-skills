@@ -1,0 +1,25 @@
+{
+  "name": "event-agency-skills",
+  "description": "AI skills for event professionals — inbox triage, vendor management, and production coordination.",
+  "version": "0.1.0",
+  "author": {
+    "name": "TalkValue",
+    "url": "https://trytalkvalue.com"
+  },
+  "repository": "https://github.com/talkvalue/event-agency-skills",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/talkvalue/event-agency-skills",
+  "keywords": [
+    "events",
+    "event-management",
+    "google-workspace",
+    "gmail",
+    "event-coordinator",
+    "claude-code",
+    "plugin"
+  ],
+  "prerequisites": {
+    "bins": ["gws"],
+    "setup": "Install gws CLI (brew install gws or npm i -g @google-workspace/cli), then run: gws auth login && gws generate-skills"
+  }
+}
