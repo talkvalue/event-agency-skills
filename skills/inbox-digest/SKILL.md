@@ -1,16 +1,10 @@
 ---
-name: recipe-event-inbox-digest
+name: inbox-digest
 version: 1.0.0
-description: "Event inbox digest — triage Gmail with event domain classification (vendor/client/sponsor/speaker/venue). Use when starting your day on an event project or before a production meeting."
-metadata:
-  category: "recipe"
-  requires:
-    skills:
-      - gws-gmail
-      - gws-gmail-triage
+description: "Event inbox digest — classify emails by stakeholder type (vendor/client/sponsor/speaker/venue) and priority tier with temporal overrides. Use when triaging event email, starting your day on an event project, or before a production meeting. Triggers: 'triage inbox', 'email digest', 'inbox digest', 'event email', 'check my email'."
 ---
 
-# Event Inbox Digest
+# Inbox Digest
 
 ## Purpose
 
@@ -31,6 +25,15 @@ This skill applies event production logic to your Gmail so you can walk into eve
 
 ---
 
+## When NOT to Use
+
+- **Not for composing or drafting email replies.** This skill triages and classifies — it does not write responses. Use it to decide what to respond to, then compose separately.
+- **Not for non-event email.** Personal inbox, newsletters, or unrelated project threads should not be mixed in. Run this skill scoped to a specific event or project name.
+- **Not for real-time event monitoring.** Use this for periodic triage (start of day, pre-meeting), not continuous inbox watching. It produces a point-in-time snapshot, not a live feed.
+- **Not for email migration or cleanup.** This produces a prioritized digest, not inbox organization. It does not archive, label, move, or delete any messages.
+
+---
+
 ## Inputs
 
 | Input | Required | Default | Notes |
@@ -39,6 +42,27 @@ This skill applies event production logic to your Gmail so you can walk into eve
 | Time range | No | 24h | Accepts: `24h`, `48h`, `72h`, `1w`, or custom date range `YYYY/MM/DD:YYYY/MM/DD` |
 | Sender domains | No | — | Comma-separated list to narrow scope (e.g., `venuegroup.com,floraltrio.com`) |
 | Save path | No | `{event-name}/digests/` | Override destination folder for the dated digest file |
+
+---
+
+## Quick Reference
+
+#### Stakeholder Types
+| Type | Key Signals |
+|------|------------|
+| Vendor | AV, catering, security, decor, transport, staffing, rentals |
+| Client | Paying organization, corporate domain, C-suite/VP titles |
+| Sponsor | Activation, booth, logo placement, sponsor deck |
+| Speaker | Bureau domain, rider, session, keynote, bio and headshot |
+| Venue | Hotel/convention center, dock, load-in, COI, floor plan |
+| Internal | Own domain, team aliases, automated notifications |
+
+#### Priority Tiers
+| Tier | Response Window | Default |
+|------|----------------|---------|
+| 1 — Immediate | 1-2 hours | Vendor D-14, any cancellation/delay/safety |
+| 2 — Today | Business hours | Vendor (default), Client, Venue |
+| 3 — Tracking | No action | Sponsor, Speaker, Internal |
 
 ---
 
@@ -60,6 +84,8 @@ This skill applies event production logic to your Gmail so you can walk into eve
    - **Subject line** — scan for keywords: advance, rider, COI, contract, invoice, PO, load-in, run-of-show, ROS, confirmation, revision, approval, hold, deposit, balance, dietary, accreditation, credential, badge, AV, logistics
    - **Thread age** — time since last message
    - **Body excerpt** — first 300 characters for deadline/commitment signals
+
+   **MUST** apply temporal override rules before finalizing tier assignments.
 
 5. Classify each thread by **Stakeholder Type**:
 
@@ -136,7 +162,7 @@ If yes:
 
 ### Digest Header
 ```
-# Event Inbox Digest — {Event Name}
+# Inbox Digest — {Event Name}
 Generated: {timestamp}
 Period: Last {time_range}
 Threads: {n} Immediate · {n} Today · {n} Tracking · {n} Stale Flagged
@@ -179,7 +205,7 @@ Threads: {n} Immediate · {n} Today · {n} Tracking · {n} Stale Flagged
 
 2. **Classify by what the email NEEDS, not who sent it.** A venue coordinator sending a friendly check-in that contains a contract revision question is a Tier 1 thread, not a Tier 3 one. Read the ask. The stakeholder type determines your response channel and urgency framing; the content determines the tier.
 
-3. **Flag stale threads proactively.** In event production, silence is interpreted as confirmation or abandonment. A thread you haven't replied to in 24h is actively creating risk: the vendor assumes you approved their timeline, the client assumes you're handling it, the speaker assumes they don't need to prepare. Surface stale threads every time, without exception.
+3. **Flag stale threads proactively.** **NEVER** generate a digest without checking stale threads. The stale thread section is the highest-value output. In event production, silence is interpreted as confirmation or abandonment. A thread you haven't replied to in 24h is actively creating risk: the vendor assumes you approved their timeline, the client assumes you're handling it, the speaker assumes they don't need to prepare. Surface stale threads every time, without exception.
 
 4. **One digest, one event.** Do not mix threads from multiple events in a single digest. If you're running parallel events, run separate digests. Cross-event context collapse is how production details fall through the cracks.
 
@@ -191,7 +217,7 @@ Threads: {n} Immediate · {n} Today · {n} Tracking · {n} Stale Flagged
 
 2. **Treating all vendor emails as urgent.** Tier 1 is for threads that require action today. A vendor submitting their W-9 three weeks before the event is Tier 2 or Tier 3 depending on your payment timeline. Crying wolf on vendor urgency trains you to ignore the tier system the week it actually matters.
 
-3. **Missing timeline and deadline mentions in the body.** Subject lines lie. Scan the first 300 characters of every Tier 1 and Tier 2 thread body. "Quick question" subject lines often contain hard deadlines. "FYI" threads sometimes contain delivery windows that need verbal confirmation. If the body contains a date, a time, or the words "by", "before", "deadline", "due", or "confirm by" — that thread's tier may need to be upgraded.
+3. **Missing timeline and deadline mentions in the body.** Subject lines lie. **ALWAYS** scan the first 300 characters of every Tier 1 and Tier 2 thread body. "Quick question" subject lines often contain hard deadlines. "FYI" threads sometimes contain delivery windows that need verbal confirmation. If the body contains a date, a time, or the words "by", "before", "deadline", "due", or "confirm by" — that thread's tier may need to be upgraded.
 
 4. **Generating a digest without checking stale threads.** The stale thread section is not optional. It is the highest-value output in the digest for active events. Skip it and you are producing a document that actively obscures risk.
 
@@ -210,6 +236,40 @@ Threads: {n} Immediate · {n} Today · {n} Tracking · {n} Stale Flagged
 | **Drive — upload** | `gws drive +upload --file {digest_path} --folder {project_folder_id}` | Save completed digest to project Drive folder for team access |
 
 **Workflow note:** Run Calendar cross-reference before finalizing tier assignments. An email that looks like Tier 2 may escalate to Tier 1 when you confirm the event is 5 days away, not 3 weeks.
+
+---
+
+## GWS Gotchas
+
+### Gmail Search Scope
+`--query` searches **subject + body** by default. Use `subject:` to narrow to subject only. For broad event match, use `"event_name" label:inbox`.
+
+```bash
+# WRONG — misses emails where keyword is only in body
+gws gmail +triage --query 'subject:Summit'
+# CORRECT — catches body mentions too
+gws gmail +triage --query '"Summit 2026" label:inbox'
+```
+
+### Reply Without Message ID
+When triaging emails from a **different inbox** (no message ID available):
+1. Use `+send` instead of `+reply` (no threading possible)
+2. **Ask for original subject line** — never guess
+3. Save as `--draft` first for review
+
+### Stale Detection Requires Full Thread
+`+triage` returns summaries only. To check stale status accurately, read the full thread:
+```bash
+gws gmail +read --thread-id {id}
+```
+Check the last message timestamp against phase-based thresholds in `references/stale-thread-thresholds.md`.
+
+### Shared Drive Digest Storage
+When saving digest to a Shared Drive folder, include `supportsAllDrives`:
+```bash
+gws drive files create --json '{"name":"digest.md","parents":["FOLDER_ID"]}' \
+  --upload ./digest.md --params '{"supportsAllDrives":true}'
+```
 
 ---
 

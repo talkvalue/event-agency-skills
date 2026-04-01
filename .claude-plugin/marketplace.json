@@ -5,17 +5,17 @@
     "email": "support@trytalkvalue.com"
   },
   "metadata": {
-    "description": "AI skills for event professionals — inbox triage, vendor management, and production coordination.",
+    "description": "AI skills for event professionals — inbox triage, outreach, vendor management, speaker coordination, budgets, post-event analysis, and registration analytics.",
     "homepage": "https://trytalkvalue.com",
-    "version": "0.1.0"
+    "version": "1.0.0"
   },
   "plugins": [
     {
       "name": "event-agency-skills",
       "source": "./",
-      "description": "Event industry persona and recipe skills for Claude Code — inbox triage with stakeholder classification, vendor management, and a full event coordinator operating model.",
+      "description": "7 domain-knowledge skills for event production teams — inbox triage, cold outreach, vendor tracking, speaker management, budget analysis, post-event reporting, and registration analytics.",
       "category": "productivity",
-      "tags": ["events", "event-management", "gmail", "inbox-triage", "vendor-management", "production"]
+      "tags": ["events", "event-management", "event-production", "event-marketing", "gmail", "google-workspace", "vendor-management", "speaker-management", "budget-tracking", "analytics"]
     }
   ]
 }
