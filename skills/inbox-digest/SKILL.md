@@ -1,7 +1,9 @@
 ---
 name: inbox-digest
-version: 1.0.0
+version: 2.0.0
 description: "Event inbox digest — classify emails by stakeholder type (vendor/client/sponsor/speaker/venue) and priority tier with temporal overrides. Use when triaging event email, starting your day on an event project, or before a production meeting. Triggers: 'triage inbox', 'email digest', 'inbox digest', 'event email', 'check my email'."
+tools: ["composio:GMAIL_FETCH_EMAILS", "composio:GMAIL_FETCH_MESSAGE_BY_THREAD_ID", "composio:GOOGLECALENDAR_EVENTS_LIST", "composio:GOOGLESHEETS_BATCH_GET"]
+scripts: ["scripts/triage.py", "scripts/action_extractor.py"]
 ---
 
 # Inbox Digest
@@ -39,6 +41,7 @@ This skill applies event production logic to your Gmail so you can walk into eve
 | Input | Required | Default | Notes |
 |-------|----------|---------|-------|
 | Event / project name | Yes | — | Used as Gmail search query; match your email subject conventions (e.g., "Summit 2026", "Gala Oct") |
+| Event date | Yes | — | YYYY-MM-DD format; drives phase detection and urgency calculations |
 | Time range | No | 24h | Accepts: `24h`, `48h`, `72h`, `1w`, or custom date range `YYYY/MM/DD:YYYY/MM/DD` |
 | Sender domains | No | — | Comma-separated list to narrow scope (e.g., `venuegroup.com,floraltrio.com`) |
 | Save path | No | `{event-name}/digests/` | Override destination folder for the dated digest file |
@@ -72,14 +75,29 @@ This skill applies event production logic to your Gmail so you can walk into eve
 
 **Objective:** Pull all relevant email for the event and classify each thread by stakeholder type and priority tier.
 
+**Script mode** (recommended for 20+ threads):
+```bash
+python skills/inbox-digest/scripts/triage.py \
+  --event "Summit 2026" \
+  --date 2026-05-15 \
+  --range 24h \
+  --output digests/2026-05-10-kgc-2026-inbox-digest.md
+```
+
+**Interactive mode** (Claude-guided with Composio tools):
+
 1. Ask the user: "Which event or project should I triage?" Accept a name or project code.
-2. Confirm time range (default 24h) and any sender domain filters.
-3. Run the triage query:
+2. Confirm event date, time range (default 24h), and any sender domain filters.
+3. Fetch emails via Composio:
    ```
-   gws gmail +triage --query "{event_name}" --max 50
+   GMAIL_FETCH_EMAILS: query="{event_name}", max_results=50, label="INBOX"
    ```
-   If a time range other than 24h is specified, append: `--after {start_date} --before {end_date}`
-4. For each thread returned, parse:
+   If a time range other than 24h is specified, add `after:YYYY/MM/DD before:YYYY/MM/DD` to the query.
+4. Cross-reference with calendar to confirm event proximity:
+   ```
+   GOOGLECALENDAR_EVENTS_LIST: query="{event_name}", time_min=now, time_max=+30d
+   ```
+5. For each thread returned, parse:
    - **Sender name and domain**
    - **Subject line** — scan for keywords: advance, rider, COI, contract, invoice, PO, load-in, run-of-show, ROS, confirmation, revision, approval, hold, deposit, balance, dietary, accreditation, credential, badge, AV, logistics
    - **Thread age** — time since last message
@@ -87,7 +105,7 @@ This skill applies event production logic to your Gmail so you can walk into eve
 
    **MUST** apply temporal override rules before finalizing tier assignments.
 
-5. Classify each thread by **Stakeholder Type**:
+6. Classify each thread by **Stakeholder Type**:
 
    | Type | Signals |
    |------|---------|
@@ -100,7 +118,7 @@ This skill applies event production logic to your Gmail so you can walk into eve
 
    When classification is ambiguous, default to the stakeholder type with the higher production impact (Vendor > Speaker > Venue for operational threads).
 
-6. Assign **Priority Tier**:
+7. Assign **Priority Tier**:
 
    | Tier | Label | Criteria |
    |------|-------|---------|
@@ -124,6 +142,7 @@ This skill applies event production logic to your Gmail so you can walk into eve
 3. Add a **digest header** with:
    - Event name
    - Digest generated timestamp
+   - Event phase (Normal / Planning / Advance / Load-In / Show Day)
    - Time range covered
    - Total thread count by tier (e.g., "4 Immediate · 7 Today · 12 Tracking")
 4. Save to a dated file:
@@ -139,10 +158,24 @@ This skill applies event production logic to your Gmail so you can walk into eve
 
 **Objective:** Surface concrete commitments and deadlines buried in Tier 1 and Tier 2 threads.
 
+**Script mode:**
+```bash
+python skills/inbox-digest/scripts/triage.py \
+  --event "Summit 2026" --date 2026-05-15 --json --output digest.json
+
+python skills/inbox-digest/scripts/action_extractor.py \
+  --digest digest.json --event "Summit 2026" --date 2026-05-15
+```
+
+**Interactive mode:**
+
 Ask the user: "Would you like me to extract action items from Tier 1 and Tier 2 threads?"
 
 If yes:
-1. Re-read the body of each Tier 1 and Tier 2 thread using `gws gmail +read --thread-id {id}`.
+1. Re-read the body of each Tier 1 and Tier 2 thread:
+   ```
+   GMAIL_FETCH_MESSAGE_BY_THREAD_ID: thread_id={id}
+   ```
 2. Scan for:
    - **Commitments you made** ("I'll send", "we'll confirm", "will follow up")
    - **Commitments others made** ("will deliver", "sending over", "confirming by")
@@ -165,6 +198,7 @@ If yes:
 # Inbox Digest — {Event Name}
 Generated: {timestamp}
 Period: Last {time_range}
+Phase: {phase_label} ({days} days to event)
 Threads: {n} Immediate · {n} Today · {n} Tracking · {n} Stale Flagged
 ```
 
@@ -227,49 +261,43 @@ Threads: {n} Immediate · {n} Today · {n} Tracking · {n} Stale Flagged
 
 ## Tool Integration
 
-| Tool | Command Pattern | Purpose |
-|------|----------------|---------|
-| **Gmail — triage** | `gws gmail +triage --query "{event_name}" --max 50` | Pull and classify event threads |
-| **Gmail — read** | `gws gmail +read --thread-id {id}` | Read full thread body for action item extraction |
-| **Calendar — agenda** | `gws calendar +agenda --query "{event_name}" --days 14` | Cross-reference email threads against event milestones; confirm load-in dates for tier escalation |
-| **Sheets — read** | `gws sheets +read --spreadsheet-id {id}` | Load vendor/client/sponsor contact list to validate sender classification |
-| **Drive — upload** | `gws drive +upload --file {digest_path} --folder {project_folder_id}` | Save completed digest to project Drive folder for team access |
+### Composio Tools (Primary)
+
+| Tool | Action | Purpose | Safety Tier |
+|------|--------|---------|-------------|
+| **Gmail — fetch** | `GMAIL_FETCH_EMAILS` | Pull event threads by search query | T1 Read |
+| **Gmail — read thread** | `GMAIL_FETCH_MESSAGE_BY_THREAD_ID` | Read full thread body for action items | T1 Read |
+| **Gmail — read message** | `GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID` | Read individual message details | T1 Read |
+| **Calendar — events** | `GOOGLECALENDAR_EVENTS_LIST` | Cross-reference event dates for phase calculation | T1 Read |
+| **Sheets — read** | `GOOGLESHEETS_BATCH_GET` | Load vendor/client/sponsor contact list for classification | T1 Read |
+| **Drive — upload** | `GOOGLEDRIVE_UPLOAD_FILE` | Save completed digest to project Drive folder | T2 Write |
+
+### Scripts
+
+| Script | Command | Purpose |
+|--------|---------|---------|
+| **triage.py** | `python skills/inbox-digest/scripts/triage.py --event "..." --date YYYY-MM-DD` | Automated batch triage with stakeholder classification and phase-aware urgency |
+| **action_extractor.py** | `python skills/inbox-digest/scripts/action_extractor.py --digest digest.json --event "..." --date YYYY-MM-DD` | Extract action items, commitments, and deadlines from classified threads |
 
 **Workflow note:** Run Calendar cross-reference before finalizing tier assignments. An email that looks like Tier 2 may escalate to Tier 1 when you confirm the event is 5 days away, not 3 weeks.
 
 ---
 
-## GWS Gotchas
+## Composio Notes
 
-### Gmail Search Scope
-`--query` searches **subject + body** by default. Use `subject:` to narrow to subject only. For broad event match, use `"event_name" label:inbox`.
-
-```bash
-# WRONG — misses emails where keyword is only in body
-gws gmail +triage --query 'subject:Summit'
-# CORRECT — catches body mentions too
-gws gmail +triage --query '"Summit 2026" label:inbox'
+### Gmail Search Syntax
+Composio's `GMAIL_FETCH_EMAILS` uses standard Gmail search syntax in the `query` parameter:
+```
+"Summit 2026" label:inbox             # Broad event match
+"Summit 2026" after:2026/03/01        # With date filter
+from:vendor@soundco.com "Summit"      # Specific sender
 ```
 
-### Reply Without Message ID
-When triaging emails from a **different inbox** (no message ID available):
-1. Use `+send` instead of `+reply` (no threading possible)
-2. **Ask for original subject line** — never guess
-3. Save as `--draft` first for review
+### Thread Reading for Stale Detection
+`GMAIL_FETCH_EMAILS` returns summaries. For accurate stale detection, read the full thread with `GMAIL_FETCH_MESSAGE_BY_THREAD_ID` and check the last message timestamp against phase-based thresholds.
 
-### Stale Detection Requires Full Thread
-`+triage` returns summaries only. To check stale status accurately, read the full thread:
-```bash
-gws gmail +read --thread-id {id}
-```
-Check the last message timestamp against phase-based thresholds in `references/stale-thread-thresholds.md`.
-
-### Shared Drive Digest Storage
-When saving digest to a Shared Drive folder, include `supportsAllDrives`:
-```bash
-gws drive files create --json '{"name":"digest.md","parents":["FOLDER_ID"]}' \
-  --upload ./digest.md --params '{"supportsAllDrives":true}'
-```
+### Contact List for Classification
+If a vendor/client spreadsheet is available, load it via `GOOGLESHEETS_BATCH_GET` before classification. Map sender domains to stakeholder types for higher accuracy than keyword matching alone.
 
 ---
 
@@ -278,3 +306,5 @@ gws drive files create --json '{"name":"digest.md","parents":["FOLDER_ID"]}' \
 - [`references/event-email-patterns.md`](references/event-email-patterns.md) — Subject line patterns, sender domain conventions, and keyword lists for each stakeholder type. Use when classification is ambiguous.
 - [`references/priority-rules.md`](references/priority-rules.md) — Full decision tree for tier assignment including event-phase overrides, payment deadline escalation logic, and client communication SLAs.
 - [`references/stale-thread-thresholds.md`](references/stale-thread-thresholds.md) — Stale thresholds by stakeholder type and event phase. Vendor stale threshold differs from sponsor stale threshold. Day-of thresholds differ from advance thresholds.
+- [`scripts/triage.py`](scripts/triage.py) — CLI script for automated inbox triage.
+- [`scripts/action_extractor.py`](scripts/action_extractor.py) — CLI script for action item extraction from classified threads.

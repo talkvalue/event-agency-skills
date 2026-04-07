@@ -1,7 +1,9 @@
 ---
 name: speaker-management
-version: 1.0.0
+version: 2.0.0
 description: "Speaker materials tracking, content quality, and deadline management for events. Tracks bios, headshots, session abstracts, learning outcomes, slide decks, and travel logistics with quality gates, reminder cadence, and deadline enforcement. Triggers: 'speaker management', 'speaker materials', 'speaker tracker', 'speaker status', 'speaker bio', 'speaker deadline', 'speaker reminder', 'session abstract', 'learning outcomes'."
+tools: ["composio:GOOGLESHEETS_BATCH_GET", "composio:GOOGLESHEETS_BATCH_UPDATE", "composio:GMAIL_CREATE_EMAIL_DRAFT", "composio:GMAIL_SEND_DRAFT", "composio:GMAIL_FETCH_EMAILS", "composio:GOOGLEDRIVE_LIST_FILES", "composio:GOOGLEDRIVE_UPLOAD_FILE", "composio:GOOGLEDOCS_CREATE_DOCUMENT"]
+scripts: ["scripts/materials_tracker.py"]
 ---
 
 # Speaker Management
@@ -232,47 +234,32 @@ Updated: [current date]
 
 ## Tool Integration
 
-| Tool | Command Pattern | Purpose |
-|------|----------------|---------|
-| **Sheets — read** | `gws sheets +read --spreadsheet {ID}` | Load speaker roster and materials tracker |
-| **Sheets — append** | `gws sheets +append --spreadsheet {ID} --range {range} --values {json}` | Add new speakers or update submission status |
-| **Gmail — draft** | `gws gmail +send --to {email} --subject {subj} --body {body} --draft` | Save reminder emails as drafts for review (T2) |
-| **Gmail — send** | `gws gmail +send --to {email} --subject {subj} --body {body}` | Send reminders after user approval (T3 — requires --dry-run first) |
-| **Gmail — triage** | `gws gmail +triage --query "from:{speaker_email}" --max 10` | Check prior correspondence with a speaker |
-| **Drive — list** | `gws drive +list --query "name contains '{speaker}'" --supportsAllDrives` | Find submitted headshots, slides, or bios in Drive |
-| **Drive — upload** | `gws drive +upload --file {path} --parent {folder_id} --supportsAllDrives` | Upload processed speaker assets to shared folder |
-| **Docs — write** | `gws docs +write --doc {ID} --body {content}` | Create speaker content documents (bio variations, quality reports) |
+### Composio Tools (Primary)
 
-## GWS Gotchas
+| Tool | Action | Purpose | Safety Tier |
+|------|--------|---------|-------------|
+| **Sheets — read** | `GOOGLESHEETS_BATCH_GET` | Load speaker roster and materials tracker | T1 Read |
+| **Sheets — update** | `GOOGLESHEETS_BATCH_UPDATE` | Update submission status | T2 Write |
+| **Gmail — check** | `GMAIL_FETCH_EMAILS` | Check prior correspondence with a speaker | T1 Read |
+| **Gmail — draft** | `GMAIL_CREATE_EMAIL_DRAFT` | Save reminder emails as drafts | T2 Write |
+| **Gmail — send** | `GMAIL_SEND_DRAFT` | Send reminders after approval | T3 Dangerous |
+| **Drive — find** | `GOOGLEDRIVE_LIST_FILES` | Find submitted headshots, slides, bios | T1 Read |
+| **Drive — upload** | `GOOGLEDRIVE_UPLOAD_FILE` | Upload processed speaker assets | T2 Write |
+| **Docs — create** | `GOOGLEDOCS_CREATE_DOCUMENT` | Create speaker content documents | T2 Write |
 
-### Sheets Append-Only Limitation
-`+append` adds rows — it cannot update existing cells. To update a speaker's status in an existing row, use the raw API:
-```bash
-GWS_ACCOUNT=user@domain.com gws sheets spreadsheets values update \
-  --spreadsheetId {ID} \
-  --range "Sheet1!E5" \
-  --params '{"valueInputOption":"USER_ENTERED"}' \
-  --body '{"values":[["✅"]]}'
+### Scripts
+
+| Script | Command | Purpose |
+|--------|---------|---------|
+| **materials_tracker.py** | `python skills/speaker-management/scripts/materials_tracker.py --event "..." --date YYYY-MM-DD --spreadsheet ID` | Speaker materials status dashboard with deadline compliance and quality checks |
+
+## Composio Notes
+
+### Speaker File Search
+Search for speaker assets across Drive:
+```
+GOOGLEDRIVE_LIST_FILES: query="name contains 'headshot' and 'Kim'"
 ```
 
-### Shared Drive (supportsAllDrives)
-Speaker folders often live on a Shared Drive. All Drive operations MUST include `--supportsAllDrives`:
-```bash
-gws drive +list --query "name contains 'headshot'" --supportsAllDrives
-gws drive +upload --file headshot.jpg --parent {folder_id} --supportsAllDrives
-```
-Without this flag, files on Shared Drives return empty results silently.
-
-### Draft Management
-No helper command for listing or deleting drafts. Use raw API:
-```bash
-GWS_ACCOUNT=user@domain.com gws gmail users drafts list --params '{"userId":"me"}'
-```
-
-### T3 Safety for Reminder Sends
-Every `+send` (non-draft) requires `--dry-run` first:
-```bash
-gws gmail +send --to speaker@company.com --subject "..." --body "..." --dry-run
-# Review preview, confirm recipient with user, then:
-gws gmail +send --to speaker@company.com --subject "..." --body "..."
-```
+### Reminder Email Safety
+Reminder sends are T3 operations. Always create a draft first (`GMAIL_CREATE_EMAIL_DRAFT`), preview with the user, then send (`GMAIL_SEND_DRAFT`) after explicit approval.

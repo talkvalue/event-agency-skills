@@ -1,7 +1,9 @@
 ---
 name: cold-outreach
-version: 1.0.0
+version: 2.0.0
 description: "Personalized B2B cold outreach for events — craft buyer, sponsor, and speaker prospecting emails with proven 4-touch follow-up sequences. Covers target profiling, role-specific angles, and quality checks for each email in the cadence. Triggers: 'cold email', 'outreach', 'prospecting', 'buyer email', 'sponsor outreach', 'speaker invitation'."
+tools: ["composio:GOOGLESHEETS_BATCH_GET", "composio:GMAIL_CREATE_EMAIL_DRAFT", "composio:GMAIL_SEND_DRAFT", "composio:GMAIL_FETCH_EMAILS", "composio:HUBSPOT_SEARCH_CONTACTS_BY_CRITERIA"]
+scripts: ["scripts/prospect_research.py", "scripts/sequence_builder.py"]
 ---
 
 # Cold Outreach
@@ -201,48 +203,49 @@ Subject: Re: [Email 1 subject]
 
 **Opening lines:**
 - BAD: "I hope this finds you well. I wanted to reach out about an exciting opportunity..."
-- GOOD: "Your team's expansion into Southeast Asian markets caught my eye — 40% of SommCon attendees are distributors in that region."
+- GOOD: "Your team's expansion into Southeast Asian markets caught my eye — 40% of FoodExpo attendees are distributors in that region."
 
 **Subject lines:**
 - BAD: "Partnership Opportunity"
-- GOOD: "SommCon 2026 — 200 wine distributors, [Company] should be there"
+- GOOD: "FoodExpo 2026 — 200 wine distributors, [Company] should be there"
 
 **Sponsor pitch:**
 - BAD: "We'd love to discuss sponsorship opportunities for our upcoming conference."
-- GOOD: "A branded tasting lounge in front of 200 procurement directors — here's what that looks like at SommCon."
+- GOOD: "A branded tasting lounge in front of 200 procurement directors — here's what that looks like at FoodExpo."
 
 ## Tool Integration
 
-| Tool | Command Pattern | Purpose |
-|------|----------------|---------|
-| **Sheets — read** | `gws sheets +read --spreadsheet {ID}` | Load target list with contact details and personalization data |
-| **Gmail — draft** | `gws gmail +send --to {email} --subject {subj} --body {body} --draft` | Save emails as drafts for review before sending (T2) |
-| **Gmail — send** | `gws gmail +send --to {email} --subject {subj} --body {body}` | Send after user approval (T3 — requires --dry-run first) |
-| **Gmail — triage** | `gws gmail +triage --query "to:{email}" --max 10` | Check if prior outreach exists before sending |
+### Composio Tools (Primary)
 
-## GWS Gotchas
+| Tool | Action | Purpose | Safety Tier |
+|------|--------|---------|-------------|
+| **Sheets — read** | `GOOGLESHEETS_BATCH_GET` | Load target list with contact details and personalization data | T1 Read |
+| **HubSpot — search** | `HUBSPOT_SEARCH_CONTACTS_BY_CRITERIA` | Search CRM for prospect data and prior interactions | T1 Read |
+| **Gmail — check** | `GMAIL_FETCH_EMAILS` | Check if prior outreach exists before sending | T1 Read |
+| **Gmail — draft** | `GMAIL_CREATE_EMAIL_DRAFT` | Save emails as drafts for review before sending | T2 Write |
+| **Gmail — send** | `GMAIL_SEND_DRAFT` | Send approved draft (T3 — requires preview first) | T3 Dangerous |
 
-### Email Body Formatting
-- **Plain text**: use `\n\n` between paragraphs only. One paragraph = one continuous line.
-- **HTML mode** (`--html`): use `<p>` tags. `\n` in HTML mode renders as literal text, not line breaks.
-- Default to plain text for cold outreach — HTML formatting can trigger spam filters.
+### Scripts
 
-### Draft Management
-No helper command for listing or deleting drafts. Use raw API:
-```bash
-GWS_ACCOUNT=user@domain.com gws gmail users drafts list --params '{"userId":"me"}'
+| Script | Command | Purpose |
+|--------|---------|---------|
+| **prospect_research.py** | `python skills/cold-outreach/scripts/prospect_research.py --event "..." --date YYYY-MM-DD --prospects list.csv` | Research prospects and generate personalized outreach angles |
+| **sequence_builder.py** | `python skills/cold-outreach/scripts/sequence_builder.py --profiles profiles.json --event "..." --date YYYY-MM-DD` | Build 4-touch sequences with quality checks, optionally create Gmail drafts |
+
+## Composio Notes
+
+### Plain Text for Cold Outreach
+Default to plain text when creating drafts via `GMAIL_CREATE_EMAIL_DRAFT`. HTML formatting can trigger spam filters on first-contact emails.
+
+### Prior Outreach Check
+Before sending, always check for existing correspondence:
 ```
-
-### T3 Safety for Sends
-Every `+send` (non-draft) requires `--dry-run` first:
-```bash
-gws gmail +send --to buyer@co.com --subject "..." --body "..." --dry-run
-# Review preview, then:
-gws gmail +send --to buyer@co.com --subject "..." --body "..."
+GMAIL_FETCH_EMAILS: query="to:buyer@company.com", max_results=5
 ```
+Avoid sending a cold email to someone you've already contacted.
 
-### Multi-Account Sends
-When sending from a non-default account, set `GWS_ACCOUNT`:
-```bash
-GWS_ACCOUNT=sales@agency.com gws gmail +send --from sales@agency.com ...
+### HubSpot Prospect Research
+If HubSpot is connected, enrich prospect data before drafting:
+```
+HUBSPOT_SEARCH_CONTACTS_BY_CRITERIA: query="company.com", limit=10
 ```

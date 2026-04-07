@@ -1,13 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Bash(gws * +triage*)",
-      "Bash(gws * +read*)",
-      "Bash(gws * +agenda*)",
-      "Bash(gws * list*)",
-      "Bash(gws * get*)",
-      "Bash(gws * schema*)",
-      "Bash(gws auth *)"
+      "Bash(python skills/*/scripts/*.py *)",
+      "Bash(pip install -r requirements.txt)",
+      "mcp__composio__GMAIL_FETCH_EMAILS",
+      "mcp__composio__GMAIL_FETCH_MESSAGE_BY_THREAD_ID",
+      "mcp__composio__GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+      "mcp__composio__GMAIL_LIST_THREADS",
+      "mcp__composio__GMAIL_LIST_LABELS",
+      "mcp__composio__GOOGLECALENDAR_EVENTS_LIST",
+      "mcp__composio__GOOGLESHEETS_BATCH_GET",
+      "mcp__composio__GOOGLEDRIVE_LIST_FILES",
+      "mcp__composio__GOOGLEDOCS_GET_DOCUMENT",
+      "mcp__composio__HUBSPOT_SEARCH_CONTACTS_BY_CRITERIA"
     ]
   }
 }

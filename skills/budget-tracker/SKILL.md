@@ -1,7 +1,9 @@
 ---
 name: budget-tracker
-version: 1.0.0
+version: 2.0.0
 description: "Event budget tracking — variance analysis, invoice aging, and payment follow-up for live event production. Use when reviewing event budgets, tracking spend vs. estimates, monitoring vendor invoices, or drafting payment follow-up messages. Triggers: 'budget', 'variance', 'invoice aging', 'overdue invoice', 'budget tracker', 'event budget', 'spend vs estimate', 'payment follow-up'."
+tools: ["composio:GOOGLESHEETS_BATCH_GET", "composio:GOOGLESHEETS_BATCH_UPDATE", "composio:GOOGLEDRIVE_LIST_FILES", "composio:GMAIL_CREATE_EMAIL_DRAFT", "composio:GMAIL_SEND_DRAFT"]
+scripts: ["scripts/variance_analyzer.py"]
 ---
 
 # Budget Tracker
@@ -211,29 +213,26 @@ This skill takes your budget spreadsheet, invoice data, or verbal summary and pr
 
 ## Tool Integration
 
-| Tool | Command Pattern | Purpose |
-|------|----------------|---------|
-| **Sheets — read** | `gws sheets +read --spreadsheet {ID}` | Load budget tracker or invoice data from Google Sheets |
-| **Sheets — append** | `gws sheets +append --spreadsheet {ID} --range {range} --values {data}` | Log new actuals or invoice status updates (T2) |
-| **Drive — list** | `gws drive +list --query "name contains 'budget'" --supportsAllDrives` | Find budget files across personal and shared drives |
-| **Gmail — draft** | `gws gmail +send --to {email} --subject {subj} --body {body} --draft` | Save payment follow-up as draft for review (T2) |
-| **Gmail — send** | `gws gmail +send --to {email} --subject {subj} --body {body}` | Send follow-up after user approval (T3 — requires --dry-run first) |
+### Composio Tools (Primary)
 
-## GWS Gotchas
+| Tool | Action | Purpose | Safety Tier |
+|------|--------|---------|-------------|
+| **Sheets — read** | `GOOGLESHEETS_BATCH_GET` | Load budget tracker or invoice data | T1 Read |
+| **Sheets — update** | `GOOGLESHEETS_BATCH_UPDATE` | Log new actuals or invoice status updates | T2 Write |
+| **Drive — find** | `GOOGLEDRIVE_LIST_FILES` | Find budget files across drives | T1 Read |
+| **Gmail — draft** | `GMAIL_CREATE_EMAIL_DRAFT` | Save payment follow-up as draft | T2 Write |
+| **Gmail — send** | `GMAIL_SEND_DRAFT` | Send follow-up after approval | T3 Dangerous |
 
-### Sheets Append-Only Pattern
-When updating budget actuals in Sheets, prefer `+append` to add new rows rather than overwriting existing data. This preserves the audit trail — you can always see what changed and when. If you must update a cell in place, confirm with the user first (T2 operation).
+### Scripts
 
-### Shared Drive Access
-Budget files are often stored on Shared Drives. Always include `--supportsAllDrives` in Drive commands, or files on shared drives will silently not appear in results.
+| Script | Command | Purpose |
+|--------|---------|---------|
+| **variance_analyzer.py** | `python skills/budget-tracker/scripts/variance_analyzer.py --event "..." --spreadsheet ID` | Budget variance analysis with category-aware thresholds and invoice aging |
 
-### Follow-Up Email Safety
-Payment follow-ups are T3 operations — always `--dry-run` first:
-```bash
-gws gmail +send --to vendor@company.com --subject "Invoice #1234 — Payment Follow-Up" --body "..." --dry-run
-# Review preview, confirm recipient and tone with user, then:
-gws gmail +send --to vendor@company.com --subject "Invoice #1234 — Payment Follow-Up" --body "..."
-```
+## Composio Notes
 
 ### Currency and Number Formatting
-When reading budget data from Sheets, amounts may come through as raw numbers without currency formatting. Always confirm the currency (USD, KRW, EUR) with the user before presenting financial summaries. Do not assume USD.
+When reading budget data from Sheets via `GOOGLESHEETS_BATCH_GET`, amounts come as raw numbers without currency formatting. Always confirm the currency (USD, KRW, EUR) with the user before presenting financial summaries.
+
+### Audit Trail
+When updating budget actuals, prefer appending new rows over overwriting existing data. This preserves the audit trail.

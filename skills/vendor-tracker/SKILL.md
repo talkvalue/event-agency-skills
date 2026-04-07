@@ -1,7 +1,9 @@
 ---
 name: vendor-tracker
-version: 1.0.0
+version: 2.0.0
 description: "Event vendor status tracking — monitor contracts, deliverables, and deadlines with phase-aware escalation for live event productions. Use when checking vendor status, tracking deliverables, or managing vendor communications. Triggers: 'vendor status', 'vendor tracker', 'check vendors', 'vendor follow-up', 'vendor deliverables'."
+tools: ["composio:GOOGLESHEETS_BATCH_GET", "composio:GOOGLESHEETS_BATCH_UPDATE", "composio:GMAIL_FETCH_EMAILS", "composio:GMAIL_CREATE_EMAIL_DRAFT", "composio:GOOGLECALENDAR_EVENTS_LIST"]
+scripts: ["scripts/status_check.py", "scripts/escalation.py"]
 ---
 
 # Vendor Tracker
@@ -33,8 +35,8 @@ Event production depends on dozens of vendors delivering on time — AV, caterin
 | Input | Required | Default | Notes |
 |-------|----------|---------|-------|
 | Event name | Yes | — | For context and file naming |
-| Event date | Yes | — | Drives phase detection and urgency calculations |
-| Vendor data source | Yes | — | Spreadsheet, email threads, or verbal summary of vendors and their status |
+| Event date | Yes | — | YYYY-MM-DD; drives phase detection and urgency calculations |
+| Vendor data source | Yes | — | Spreadsheet ID, JSON file path, or verbal summary |
 | Vendor list | No | — | If not provided, skill will ask for vendor names, types, and outstanding items |
 
 ## Quick Reference
@@ -68,7 +70,20 @@ Event production depends on dozens of vendors delivering on time — AV, caterin
 
 ### Task 1: Build Vendor Status Overview
 
-1. Collect vendor data from the provided source (spreadsheet, email summary, or verbal list).
+**Script mode** (recommended):
+```bash
+python skills/vendor-tracker/scripts/status_check.py \
+  --event "Summit 2026" \
+  --date 2026-05-10 \
+  --spreadsheet "SPREADSHEET_ID" \
+  --output vendor-status.md
+```
+
+**Interactive mode** (Claude-guided with Composio tools):
+
+1. Collect vendor data from the provided source.
+   - Spreadsheet: `GOOGLESHEETS_BATCH_GET: spreadsheet_id={ID}, ranges="Sheet1"`
+   - Or accept a JSON file / verbal list from user
 2. For each vendor, capture:
    - **Vendor name and type** (AV, catering, venue, etc.)
    - **Contract status**: Signed / Pending / Not started
@@ -95,6 +110,17 @@ Event production depends on dozens of vendors delivering on time — AV, caterin
 
 ### Task 3: Generate Escalation Actions
 
+**Script mode:**
+```bash
+python skills/vendor-tracker/scripts/status_check.py \
+  --event "Summit 2026" --date 2026-05-10 \
+  --spreadsheet "ID" --json --output status.json
+
+python skills/vendor-tracker/scripts/escalation.py \
+  --status status.json --event "Summit 2026" --date 2026-05-10 \
+  --create-drafts
+```
+
 For each OVERDUE or AT RISK item, recommend the appropriate escalation:
 
 **Escalation path by vendor type:**
@@ -110,10 +136,14 @@ For show day overdue: **Skip email. Phone call immediately.** **NEVER** send fol
 ### Task 4: Generate Follow-Up Communications
 
 For each vendor requiring follow-up:
-1. Draft an email that:
-   - References the original request or deliverable specifically
-   - States the deadline clearly
-   - Asks for a specific response ("Can you confirm delivery by [date]?")
+1. Draft an email via Composio:
+   ```
+   GMAIL_CREATE_EMAIL_DRAFT: to={vendor_email}, subject="RE: {original_subject}", body={draft}
+   ```
+   The draft must:
+   - Reference the original request or deliverable specifically
+   - State the deadline clearly
+   - Ask for a specific response ("Can you confirm delivery by [date]?")
    - Does NOT use guilt or pressure language — vendors respond better to clarity
 2. For phone follow-ups, prepare a brief:
    - Vendor name and account manager
@@ -194,24 +224,39 @@ Vendors: {n} total · {n} on track · {n} at risk · {n} overdue · {n} blocked
 
 ## Tool Integration
 
-| Tool | Command Pattern | Purpose |
-|------|----------------|---------|
-| **Sheets — read** | `gws sheets +read --spreadsheet {ID}` | Load vendor tracker spreadsheet |
-| **Sheets — append** | `gws sheets +append --spreadsheet {ID} --values "..."` | Update vendor status rows |
-| **Gmail — triage** | `gws gmail +triage --query "from:{vendor_domain}" --max 20` | Check latest vendor communications |
-| **Gmail — draft** | `gws gmail +send --to {vendor} --subject {subj} --body {body} --draft` | Generate follow-up drafts |
-| **Calendar — agenda** | `gws calendar +agenda --days 14` | Cross-reference event date for phase calculation |
+### Composio Tools (Primary)
 
-## GWS Gotchas
+| Tool | Action | Purpose | Safety Tier |
+|------|--------|---------|-------------|
+| **Sheets — read** | `GOOGLESHEETS_BATCH_GET` | Load vendor tracker spreadsheet | T1 Read |
+| **Sheets — update** | `GOOGLESHEETS_BATCH_UPDATE` | Update vendor status rows | T2 Write |
+| **Gmail — fetch** | `GMAIL_FETCH_EMAILS` | Check latest vendor communications | T1 Read |
+| **Gmail — draft** | `GMAIL_CREATE_EMAIL_DRAFT` | Generate follow-up drafts | T2 Write |
+| **Calendar — events** | `GOOGLECALENDAR_EVENTS_LIST` | Cross-reference event date for phase calculation | T1 Read |
 
-### Sheets Append vs Update
-`+append` only adds rows at the bottom. To update a specific vendor's status in an existing row, use the raw API:
-```bash
-gws sheets spreadsheets values update --params '{"spreadsheetId":"ID","range":"Sheet1!F3","valueInputOption":"RAW"}' --json '{"values":[["CONFIRMED"]]}'
+### Scripts
+
+| Script | Command | Purpose |
+|--------|---------|---------|
+| **status_check.py** | `python skills/vendor-tracker/scripts/status_check.py --event "..." --date YYYY-MM-DD --spreadsheet ID` | Build vendor status dashboard with phase-aware urgency |
+| **escalation.py** | `python skills/vendor-tracker/scripts/escalation.py --status status.json --event "..." --date YYYY-MM-DD` | Generate escalation communications and optionally create Gmail drafts |
+
+## Composio Notes
+
+### Sheets Read Pattern
+```
+GOOGLESHEETS_BATCH_GET: spreadsheet_id="ID", ranges="Sheet1!A:H"
+```
+Returns a 2D array. First row is typically headers. Map columns to vendor fields.
+
+### Sheets Update Pattern
+To update a specific vendor's status:
+```
+GOOGLESHEETS_BATCH_UPDATE: spreadsheet_id="ID", range="Sheet1!F3", values=[["CONFIRMED"]]
 ```
 
-### Shared Drive Spreadsheets
-All Shared Drive operations need `supportsAllDrives:true` or you get 404:
-```bash
-gws drive files get --params '{"fileId":"ID","supportsAllDrives":true,"fields":"id,name"}'
+### Gmail Vendor Communication Check
+Search for recent vendor emails:
+```
+GMAIL_FETCH_EMAILS: query="from:vendor@soundco.com", max_results=5
 ```

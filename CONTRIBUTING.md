@@ -4,7 +4,7 @@ Welcome to event-agency-skills. Event industry expertise is valued here — your
 
 ## Overview
 
-This repository hosts reusable Claude skills for event professionals. Each skill encodes domain knowledge for a specific event workflow — inbox triage, vendor tracking, budget reconciliation, speaker management, outreach, and analytics. Skills may integrate with Google Workspace tools (Gmail, Calendar, Docs, Sheets, Drive) but GWS integration is optional — domain knowledge is the core value.
+This repository hosts reusable event production skills powered by [Composio](https://composio.dev) for tool integration. Each skill combines domain knowledge (SKILL.md) with executable Python scripts for Gmail, Calendar, Sheets, HubSpot, and more.
 
 ---
 
@@ -15,6 +15,9 @@ This repository hosts reusable Claude skills for event professionals. Each skill
 ```
 skills/{skill-name}/
 ├── SKILL.md              # Skill definition (required)
+├── scripts/              # Executable Python scripts (required for v2+ skills)
+│   ├── main_workflow.py  # Primary script for the skill's core operation
+│   └── helper_script.py  # Optional additional scripts
 ├── references/           # Optional reference files
 │   ├── decision-tree.md
 │   └── patterns.md
@@ -28,8 +31,10 @@ Create `skills/{skill-name}/SKILL.md`:
 ```yaml
 ---
 name: your-skill-name
-version: 1.0.0
+version: 2.0.0
 description: "What it does. Use when [context]. Triggers: 'keyword1', 'keyword2'."
+tools: ["composio:GMAIL_FETCH_EMAILS", "composio:GOOGLESHEETS_BATCH_GET"]
+scripts: ["scripts/main_workflow.py"]
 ---
 
 # Your Skill Name
@@ -38,45 +43,125 @@ description: "What it does. Use when [context]. Triggers: 'keyword1', 'keyword2'
 Concise statement of the problem this skill solves. Why does this workflow matter in event production?
 
 ## When to Use
-Bulleted scenarios where this skill saves time or prevents mistakes. "Use when..." — be specific to event context.
+Bulleted scenarios where this skill saves time or prevents mistakes.
+
+## When NOT to Use
+Explicit boundaries — what this skill does NOT do.
 
 ## Inputs
 Table listing required and optional inputs with defaults and validation notes.
 
+## Quick Reference
+Domain-specific thresholds, classifications, or formulas used by the skill.
+
 ## Workflow by Task
-Numbered tasks with step-by-step instructions including actual `gws` CLI commands (if applicable).
-Example:
-```
-gws gmail +triage --query "{event_name}" --max 50
-```
+Numbered tasks with:
+- **Script mode**: CLI command examples using the Python scripts
+- **Interactive mode**: Composio tool actions for Claude-guided workflows
 
 ## Output Format
-Show the exact structure of the skill's output (markdown table, structured text, etc.).
+Show the exact structure of the skill's output.
 
 ## Principles
-3–5 statements of what makes output high-quality and why. These are the rules that prevent common mistakes.
+3-5 statements of what makes output high-quality and why.
 
 ## What to Avoid
-3–5 specific anti-patterns. Describe the mistake and what goes wrong if you don't catch it.
-
-## GWS Gotchas
-(Include this section if the skill uses GWS commands.)
-Document any GWS CLI quirks, auth edge cases, or command-specific pitfalls.
+3-5 specific anti-patterns with consequences.
 
 ## Tool Integration
-(Optional — include if the skill uses GWS tools.)
-Table of GWS tools used, commands, and purpose.
+### Composio Tools (Primary)
+Table of Composio actions used, with safety tier annotations.
+
+### Scripts
+Table of Python scripts with CLI commands and purpose.
+
+## Composio Notes
+Document any Composio-specific quirks or patterns.
 
 ## Resources
 Links to reference files and external resources.
 ```
 
+### Script Template
+
+Each script should follow this pattern:
+
+```python
+#!/usr/bin/env python3
+"""One-line description of what this script does."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from lib.composio_client import EventComposioClient
+from lib.event_context import EventContext  # and other imports as needed
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="...")
+    parser.add_argument("--event", required=True, help="Event name")
+    parser.add_argument("--date", required=True, help="Event date (YYYY-MM-DD)")
+    parser.add_argument("--output", help="Output file path (default: stdout)")
+    parser.add_argument("--json", action="store_true", help="Output as JSON")
+    parser.add_argument("--dry-run", action="store_true", help="Preview without API calls")
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    # ... implementation
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+```
+
+**Requirements:**
+- Import shared libraries from `lib/` (composio_client, event_context)
+- Use `argparse` with clear help strings
+- Support `--dry-run` that works without a Composio API key
+- Support `--json` for machine-readable output
+- Support `--output` for file output (default: stdout)
+- Include `main()` function returning an exit code
+
 ---
 
 ## Naming Conventions
 
-- **Skill directory**: `skills/{skill-name}/` — lowercase with hyphens, no prefix
-- Examples: `skills/inbox-digest/`, `skills/vendor-tracker/`, `skills/budget-tracker/`
+- **Skill directory**: `skills/{skill-name}/` — lowercase with hyphens
+- **Script files**: `skills/{skill-name}/scripts/{script_name}.py` — lowercase with underscores
+- **Shared libraries**: `lib/{module_name}.py` — lowercase with underscores
+
+---
+
+## Composio Integration
+
+### Safety Tiers
+
+All Composio tool operations must follow the 3-tier safety model in `.claude/rules/composio-safety.md`:
+
+| Tier | Actions | Rule |
+|------|---------|------|
+| **T1 Read** | `GMAIL_FETCH_EMAILS`, `GOOGLESHEETS_BATCH_GET`, etc. | Auto-allowed |
+| **T2 Write** | `GMAIL_CREATE_EMAIL_DRAFT`, `GOOGLESHEETS_BATCH_UPDATE`, etc. | Confirm with user |
+| **T3 Dangerous** | `GMAIL_SEND_DRAFT`, `GMAIL_DELETE_MESSAGE`, etc. | Preview + explicit approval |
+
+### Adding New Integrations
+
+If your skill needs a Composio tool not yet in `lib/composio_client.py`:
+
+1. Add the method to `EventComposioClient` in `lib/composio_client.py`
+2. Document the safety tier in `.claude/rules/composio-safety.md`
+3. Add the action to the `tools:` list in your SKILL.md frontmatter
+4. Update `.claude/settings.json` if it's a T1 (auto-allowed) action
 
 ---
 
@@ -84,40 +169,46 @@ Links to reference files and external resources.
 
 Before submitting a pull request:
 
-1. **Copy your skill to Claude Code's skill directory**:
+1. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   # Optional: for standalone script usage with Composio SDK
+   pip install composio
+   ```
+
+2. **Verify scripts compile**:
+   ```bash
+   python -m py_compile skills/{skill-name}/scripts/{script}.py
+   ```
+
+3. **Test dry-run mode** (no API key needed):
+   ```bash
+   python skills/{skill-name}/scripts/{script}.py --event "Test Event" --date 2026-06-01 --dry-run
+   ```
+
+4. **Test with real data** if you have a Composio API key:
+   ```bash
+   export COMPOSIO_API_KEY="your-key"
+   python skills/{skill-name}/scripts/{script}.py --event "Test Event" --date 2026-06-01
+   ```
+
+5. **Test as a Claude Code skill** (optional):
    ```bash
    cp -r skills/{skill-name} ~/.claude/skills/
+   # Then invoke in Claude Code: /skill-name
    ```
-
-2. **Invoke the skill in Claude Code**:
-   ```
-   /skill-name
-   ```
-
-3. **Test the workflow** — run through each task in the Workflow by Task section. Verify that:
-   - All steps execute and return expected results
-   - Output format matches the defined Output Format section
-   - Principles section correctly describes quality
-   - What to Avoid section actually reflects mistakes the workflow prevents
-
-4. **Test with real event data** if possible. Dummy data won't catch contextual errors.
-
-5. **(Optional) If the skill uses GWS commands**, install and authenticate:
-   ```bash
-   brew install gws && gws auth login
-   ```
-   Then verify all `gws` CLI commands execute and return expected data.
 
 ---
 
 ## Quality Bar
 
-- **Workflow by Task must have actionable steps** — each step should be executable. Include actual `gws CLI` commands where applicable, not pseudocode.
-- **Principles section required** — what makes output good in this context? What decisions does a human need to make?
-- **What to Avoid section required** — name 3–5 specific mistakes that break the skill's output. "Don't forget to..." is not enough; "If you skip X, this happens" is the right level of specificity.
-- **Event industry terminology** — use "vendor", "load-in", "run-of-show", "advance", "production week", not generic "partner", "delivery", "timeline".
-- **GWS integration is optional** — domain knowledge is the core value. A skill that encodes expert event logic without any GWS commands is still valuable.
-- **Include a GWS Gotchas section** if the skill uses GWS commands — document auth quirks, command pitfalls, and edge cases.
+- **Scripts must be executable** — every script must run with `--help` and `--dry-run` without errors
+- **Domain knowledge in SKILL.md** — the skill must encode real event production logic, not generic workflows
+- **Principles section required** — what makes output good in this event production context?
+- **What to Avoid section required** — 3-5 specific mistakes with consequences
+- **Event industry terminology** — use "vendor", "load-in", "run-of-show", "advance", not generic terms
+- **Safety tiers documented** — every Composio tool used must have a safety tier annotation
+- **Shared library usage** — import from `lib/` for Composio client and event context, don't duplicate
 
 ---
 
@@ -130,28 +221,26 @@ Before submitting a pull request:
    git checkout -b feat/{skill-name}
    ```
 
-3. **Write your skill** in `skills/{skill-name}/SKILL.md`.
+3. **Write your skill** in `skills/{skill-name}/` with SKILL.md and scripts.
 
-4. **Add any reference files** in a `references/` subdirectory (decision trees, pattern lists, etc.). Keep reference files tight — under 100 lines each.
+4. **Verify scripts compile and run** (see Testing section above).
 
-5. **Test locally** (see Testing section above).
-
-6. **Commit with a clear message**:
+5. **Commit with a clear message**:
    ```bash
    git add skills/{skill-name}/
    git commit -m "create(skill): skill-name — one-line description"
    ```
 
-7. **Push and open a PR** with:
+6. **Push and open a PR** with:
    - Skill name in the title: `Add skill: {skill-name}`
    - Description of what the skill does and when to use it
-   - Note any GWS CLI dependencies (if applicable)
-   - Link to any reference files or examples
+   - Note any new Composio integrations required
+   - Link to any reference files
 
 ---
 
 ## Questions?
 
-Check the existing skills in `skills/` for patterns and examples. The `inbox-digest` and `cold-outreach` skills demonstrate the full structure and quality bar.
+Check the existing skills in `skills/` for patterns and examples. The `inbox-digest` and `vendor-tracker` skills demonstrate the full structure and quality bar.
 
 Thank you for contributing to event-agency-skills.

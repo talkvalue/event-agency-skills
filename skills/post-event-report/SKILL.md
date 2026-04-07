@@ -1,7 +1,9 @@
 ---
 name: post-event-report
-version: 1.0.0
+version: 2.0.0
 description: "Post-event performance reporting — analyze attendance, sessions, sponsor ROI, and channel attribution. Compares actuals to goals, diagnoses what worked and what didn't, and produces actionable recommendations. Triggers: 'post-event report', 'event report', 'how did the event go', 'event performance', 'post-event analysis', 'sponsor ROI', 'event debrief'."
+tools: ["composio:GOOGLESHEETS_BATCH_GET", "composio:GOOGLEDOCS_CREATE_DOCUMENT"]
+scripts: ["scripts/report_generator.py"]
 ---
 
 # Post-Event Report
@@ -211,9 +213,17 @@ For client-facing reports, add:
 
 ## Tool Integration
 
-| Tool | Command Pattern | Purpose |
-|------|----------------|---------|
-| **Sheets — read** | `gws sheets +read --spreadsheet {ID}` | Pull registration, attendance, or survey data for analysis |
-| **Docs — write** | `gws docs +write --doc {ID} --body {content}` | Generate the full report as a Google Doc for team review |
+### Composio Tools (Primary)
 
-Note: GWS integration is optional. This skill works with whatever data the user provides — pasted into the conversation, uploaded as a file, or described verbally. Sheets and Docs are available when the user wants to pull data directly or output the report to a shared document.
+| Tool | Action | Purpose | Safety Tier |
+|------|--------|---------|-------------|
+| **Sheets — read** | `GOOGLESHEETS_BATCH_GET` | Pull registration, attendance, or survey data | T1 Read |
+| **Docs — create** | `GOOGLEDOCS_CREATE_DOCUMENT` | Generate report as a Google Doc for team review | T2 Write |
+
+### Scripts
+
+| Script | Command | Purpose |
+|--------|---------|---------|
+| **report_generator.py** | `python skills/post-event-report/scripts/report_generator.py --event "..." --date YYYY-MM-DD --registration-sheet ID` | Generate structured post-event performance report with session rankings and sponsor ROI |
+
+Note: Composio integration is optional. This skill works with whatever data the user provides — pasted into the conversation, uploaded as a file, or described verbally. Sheets and Docs are available when the user wants to pull data directly or output the report to a shared document.

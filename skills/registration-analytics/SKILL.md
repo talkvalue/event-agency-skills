@@ -1,7 +1,9 @@
 ---
 name: registration-analytics
-version: 1.0.0
+version: 2.0.0
 description: "Registration funnel analysis, campaign attribution, and segment-level conversion reporting for events. Use when analyzing registration data, measuring campaign performance, comparing attendee segments, or building post-registration reports. Triggers: 'registration analytics', 'funnel analysis', 'campaign attribution', 'registration report', 'conversion analysis', 'attendee segments'."
+tools: ["composio:GOOGLESHEETS_BATCH_GET"]
+scripts: ["scripts/attribution.py"]
 ---
 
 # Registration Analytics
@@ -56,7 +58,7 @@ Awareness (impressions, reach)
 
 | Metric | Benchmark | Source |
 |--------|-----------|--------|
-| Email open rate (event) | 20-25% standard, 65.6% SommCon peak | Industry + SommCon data |
+| Email open rate (event) | 20-25% standard, 65.6% TradeExpo peak | Industry + TradeExpo data |
 | Email click-through | 2-5% | Industry average |
 | Registration-to-attendance (paid) | 60-70% (up to 70-80% for premium) | Industry average |
 | Registration-to-attendance (free) | 30-40% | Industry average |
@@ -216,7 +218,7 @@ For each segment:
 
 4. **Single-channel attribution when reality is multi-touch.** Crediting the last email before registration ignores the LinkedIn ad that created awareness and the colleague recommendation that built trust. Always present multiple attribution models. If you can only run one, say so and note the limitation.
 
-5. **Drawing conclusions from one event.** A single event is one data point. Note when recommendations are based on a single event vs. cross-event patterns. "This worked at SommCon" is a hypothesis, not a rule.
+5. **Drawing conclusions from one event.** A single event is one data point. Note when recommendations are based on a single event vs. cross-event patterns. "This worked at TradeExpo" is a hypothesis, not a rule.
 
 6. **MUST** report both registration AND attendance numbers — registration alone overstates event success.
 
@@ -240,9 +242,16 @@ For each segment:
 
 ## Tool Integration
 
-| Tool | Command Pattern | Purpose |
-|------|----------------|---------|
-| **Sheets -- read** | `gws sheets +read --spreadsheet {ID}` | Load registration data, campaign metrics, or attendance records from Google Sheets |
-| **Sheets -- read range** | `gws sheets +read --spreadsheet {ID} --range "Sheet1!A1:Z"` | Read a specific tab or range when the spreadsheet has multiple data sets |
+### Composio Tools (Primary)
 
-GWS integration is optional. This skill works with any data source -- CSV files, CRM exports, or manually provided data. Sheets read is the most common integration for teams using Google Workspace.
+| Tool | Action | Purpose | Safety Tier |
+|------|--------|---------|-------------|
+| **Sheets — read** | `GOOGLESHEETS_BATCH_GET` | Load registration data, campaign metrics, or attendance records | T1 Read |
+
+### Scripts
+
+| Script | Command | Purpose |
+|--------|---------|---------|
+| **attribution.py** | `python skills/registration-analytics/scripts/attribution.py --event "..." --spreadsheet ID --model multi` | Multi-model attribution analysis (last-touch, first-touch, multi-touch) with segment breakdown |
+
+Composio integration is optional. This skill works with any data source — CSV files, CRM exports, or manually provided data. Sheets read is the most common integration for teams using Google Workspace.
