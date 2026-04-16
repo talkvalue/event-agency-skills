@@ -4,6 +4,8 @@ Event production runs on 47 email threads, 12 vendor deadlines, and one coordina
 
 **Open-source AI skills for live event production** — inbox triage, vendor escalation, speaker wrangling, budget tracking, and post-event reporting. Built by [TalkValue](https://trytalkvalue.com?utm_source=github&utm_medium=skill_repo&utm_campaign=event_agency_skills), tested on real conferences, trade shows, and galas.
 
+<img alt="book" src="https://github.com/user-attachments/assets/2a23fdfe-7770-48cb-b4f1-51acb681fd6d" />
+
 ---
 
 ## Skills
@@ -44,13 +46,23 @@ python skills/inbox-digest/scripts/triage.py \
 
 ## Usage with Claude Code
 
-Every skill includes a `SKILL.md` file. Install as a plugin or drop individual skills into your project:
+Every skill includes a `SKILL.md` file. The recommended path is to install all 7 skills as a Claude Code plugin via the marketplace:
+
+**1. Register the marketplace:**
+
+```
+/plugin marketplace add talkvalue/event-agency-skills
+```
+
+**2. Install the plugin from this marketplace:**
+
+```
+/plugin install event-agency-skills@event-agency-skills
+```
+
+Or drop a single skill into your project:
 
 ```bash
-# As a plugin (all 7 skills)
-claude plugin install talkvalue/event-agency-skills
-
-# Or copy one skill
 cp -r skills/inbox-digest/ your-project/.claude/skills/
 ```
 
